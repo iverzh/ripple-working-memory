@@ -56,7 +56,6 @@ bundleNotes = table2cell(bundleNotes(3:end,3:end-1));
 
 %%
 
-profile on
 computeCoRipple = false;
 rippleFR = nan(length(subj_list_full), 100);
 CoRippleRatesRegionAll = nan(length(regions), length(regions), length(subj_list_full));
@@ -71,8 +70,6 @@ recog_trials_units_all = nan(6.5e3, length(win(1):win(2)));
 recog_trials_resp_all = nan(6.5e3, length(winResp(1):winResp(2)));
 recog_trials_resp_avg_all = nan(6.5e3,1);
 recog_trials_units_resp_all = nan(6.5e3, length(winResp(1):winResp(2)));
-% recog_trials_all_region = [];
-
 whole_trial_all = nan(6.5e3, winLength);
 whole_trial_units_all = nan(6.5e3, winLength);
 whole_trials_region_all = nan(6.5e3, winLength, length(regions));
@@ -82,6 +79,7 @@ whole_trials_region_all_shuff = nan(6.5e3, winLength, length(regions));
 whole_trials_ERP_region_all  = nan(6.5e3, winLength, length(regions));
 whole_trials_BP_region_all  = nan(6.5e3, winLength, length(regions), 3);
 whole_trials_units_sm_region_all  = nan(6.5e3, winLength, length(regions));
+whole_trials_units_region_all  = nan(6.5e3, winLength, length(regions));
 whole_trials_cross_region_all = cell(length(regions));
 whole_trials_cross_region_all_shuff = cell(length(regions));
 probe_trials_units_all = cell(3, length(regions));
@@ -151,14 +149,9 @@ for subj = 1:length(subj_list_full)
     trials = load(fullfile(dataDirectory, '../task/',taskfiles{f}));
 
     
-    modifier = '1kHz_template_baselineNorm_z30';
     modifier = '1kHz_template_z25';
-%     modifier = 'LG_1kHz_z25';
-%     modifier = 'HG_1kHz_z25';
-%     modifier = 'IISremv_singleWire_v3_z25';
 
     tag = [recordingState,'_',location,'_',modifier];
-%     filename = sprintf('%s_LFP_%s_ripple_stats_%s.mat', subject, 'micro', tag);
     filename = sprintf('%s_ripple_stats_%s.mat', subject, tag);
     microObj = load(fullfile(matExportFolder, filename));
     rippleStats = microObj.rippleStats;
@@ -178,46 +171,24 @@ for subj = 1:length(subj_list_full)
     rippMaskShuff = zeros(length(rippleStats.chanLabels), rippleStats.recordingLength);
     for chRipp = 1:size(rippMask,1) %sum(strcmp(rippleStats.recordingType, 'macro'))+1:size(rippMask,1) 
         if rippleStats.density{chRipp} > 1
-%             if strcmp(rippleStats.recordingType{chRipp}, 'macro'); times = rippleStats.macroTimes;
-            if strcmp(rippleStats.recordingType{chRipp}, 'macro'); continue;
-            elseif strcmp(rippleStats.recordingType{chRipp}, 'micro'); times = rippleStats.microTimes; 
-%             elseif strcmp(rippleStats.recordingType{chRipp}, 'micro'); continue; 
-            end
+            
 
             if contains(rippleStats.chanLabels{chRipp}, 'SPE')
                 rippMask(chRipp,:) = nan(1,length(rippMask));
                 continue
             end
             
-            
-%             chLoc = regexprep(rippleStats.chanLabels{chRipp}, '\d', '');
-%             chNum = regexp(rippleStats.chanLabels{chRipp}, '\d+', 'match');
-%             chNum = str2double(chNum);
-%             epCh = find(contains(bundleLab, chLoc));
-%             
-%             bch = badChan(subj, epCh);
-%             bch = str2double(split(bch,','));
-%             
-%             if contains(bundleNotes(subj, epCh), 'Bad') || any(ismember(bch, chNum))
-%                 rippMask(chRipp,:) = nan(1,length(rippMask));
-%                 continue
-%             end
-            
 
             densityAll = [densityAll rippleStats.density{chRipp}];
             freqAll = [freqAll mean(rippleStats.oscFreq{chRipp})];
             durAll = [durAll mean(rippleStats.duration{chRipp})];
             ampAll = [ampAll mean(rippleStats.rippleAmp{chRipp})];
-%             elseif strcmp(rippleStats.recordingType{chRipp}, 'micro'); continue; end
+            
             
             iS = round(rippleStats.window{chRipp}(:,1) * 1e3);
-            iE = round(rippleStats.window{chRipp}(:,2) * 1e3);
-            
-            
+            iE = round(rippleStats.window{chRipp}(:,2) * 1e3);        
         
             for ii = 1:length(iE)
-%                 iS(ii) = find(times == iS(ii));
-%                 iE(ii) = find(times == iE(ii));
                 if any([iS(ii) iE(ii)] <= 0); continue; end
                 rippMask(chRipp,iS(ii):iE(ii)) = 1;
             end
@@ -227,80 +198,15 @@ for subj = 1:length(subj_list_full)
         
     end
     
-%     rippAll = mean(zscore(rippMask,0,2));
     rippAll = sum(rippMask);
 
     rippMask(:, end:end+3e3) = nan; %pad the ending
     rippAll(end:end+3e3) = nan; %pad the ending
-    rippMaskShuff(:, end:end+3e3) = nan; %pad the ending
-
-    
+    rippMaskShuff(:, end:end+3e3) = nan; %pad the ending  
     
     data = micrObj.lfp_data;
-%     [b,a] = butter(3,[150]/(sfreq/2), 'high');
-%     [bB,aB] = butter(3,[70 190]/(sfreq/2));
-%     [bR,aR] = butter(3,[70 100]/(sfreq/2));
-%     [bL,aL] = butter(3,[30 50]/(sfreq/2));
-%     vHG_band = NaN(size(data));
-%     vHG_band_pow = NaN(size(data));
-% 
-%     bHG_band_pow = NaN(size(data));
-%     rHG_band_pow = NaN(size(data));
-%     rHG_band_phi = NaN(size(data));
-%     LG_band_pow = NaN(size(data));
-% 
-%     for ch = 1:size(data,1)
-%         dat = data(ch,:);
-% %         dat(nan_edge_mask) = 0;
-% % 
-%         for nf = 60:60:sfreq/2 %240
-%             Wo = nf/(sfreq/2);
-%             BW = Wo/35;
-%             [bN,aN] = iirnotch(Wo, BW);
-%             dat = filtfilt(bN,aN,dat);
-%         end
-%         data(ch,:) = dat;
-%         
-%         bp = filtfilt(b,a,dat);
-%         pow = abs(hilbert(bp));
-%         ang = angle(hilbert(bp));
-% 
-% %         bp(nan_edge_mask) = nan;
-% %         ang(nan_edge_mask) = nan;
-%         rHG_band_phi(ch,:) = ang;
-%         
-%         
-% 
-%         vHG_band(ch,:) = zscore(abs(bp));
-%         vHG_band_pow(ch,:) = zscore(pow);
-% 
-%         bp = filtfilt(bB,aB,dat);
-%         pow = abs(hilbert(bp));
-%         bHG_band_pow(ch,:) = zscore(pow);
-% 
-%         bp = filtfilt(bR,aR,dat);
-%         pow = abs(hilbert(bp));
-%         rHG_band_pow(ch,:) = zscore(pow);
-% 
-%         bp = filtfilt(bL,aL,dat);
-%         pow = abs(hilbert(bp));
-%         LG_band_pow(ch,:) = zscore(pow);
-% 
-%     end
-%     vHG_band(vHG_band < 2) = 0;
-%     vHG_band(vHG_band >= 2) = 1;
-%     
-%     
-%     LG_band_pow(:, end:end+3e3) = nan; %pad the ending
-%     rHG_band_pow(:, end:end+3e3) = nan; %pad the ending
-%     vHG_band_pow(:, end:end+3e3) = nan; %pad the ending
     data(:, end:end+3e3) = nan; %pad the ending
-%     
-%     data = rHG_band_pow;
 
-
-    
-    
     units = LoadSpikeTimes(subject,'RutishauserLab', 'Sternberg');
     if isempty(units); continue; end
     U = cellfun(@(x) any(strcmp(x, {'pyr', 'int', 'mult'})), units(:,3));
@@ -330,33 +236,24 @@ for subj = 1:length(subj_list_full)
     spikeMask_sm = nan(nNeuron, length(binEdges)-1);
     for iU = 1:nNeuron 
         X = units{unitsAll(iU),2};
-    %     ISIx = [0 diff(X')];
-    %     xx = randperm(length(ISIx), length(ISIx));
-    %     Xshuff =[X(1)];
-    %     for ii = 2:length(ISIx); Xshuff(ii) = Xshuff(end) + ISIx(xx(ii)); end
         [N,EDGES] = histcounts(X,binEdges);
-        FR = sum(N) / rippleStats.recordingLength * 1000;
-    %     if FR > 0
         spikeMask(iU,:) = N;
         spikeMask_sm(iU,:) = smoothdata(N, 'gaussian',100);
-    %     end
     end
+    
     if nNeuron > 1
         unitAll = smoothdata(sum(spikeMask, 'omitnan'), 'gaussian',100);
     else
         unitAll = smoothdata(spikeMask, 'gaussian',100);
     end
-    unitAll = zscore(unitAll); % - mean(unitAll);
+    unitAll = zscore(unitAll);
     
     baselineMask = false(1, length(rippMask));
 
     for iT = 1:length(trials.start_time)
-
             trialLoad = trials.loads(iT);
             image1Time =  round(trials.timestamps_Encoding1(iT)*1e3);
-            
             baselineMask(image1Time-1000:image1Time-1) = true; %baseline
-        
     end
     
     
@@ -382,11 +279,7 @@ for subj = 1:length(subj_list_full)
             trialData(1:length(dat)) = dat;
         end
         recog_trials_all(cTrial, :) = trialData;
-        
 
-
-        
-        
         dat = sum(spikeMask_sm(:,respTime+winResp(1):respTime+winResp(2)),1);% / size(spikeMask_sm, 1);
         recog_trials_units_resp_all(cTrial, :) = dat;
         
@@ -400,15 +293,13 @@ for subj = 1:length(subj_list_full)
         maintenanceTime =  round(trials.timestamps_Maintenance(iT)*1e3);
         probeTime =  round(trials.timestamps_Probe(iT)*1e3);
         
-%         dat = ( rippAll - mean(rippAll, 'omitnan') ) / std(rippAll, 'omitnan');
         dat = rippAll(respTime+winResp(1):respTime+winResp(2));
-        recog_trials_resp_all(cTrial, :) = (dat); %/mean(rippAll(baselineMask), 'omitnan');
+        recog_trials_resp_all(cTrial, :) = dat;
         
         dat = rippMask(:, respTime-2000:respTime);
         dat = mean(dat,2) ./ mean(rippMask(:, baselineMask),2);
         
         resp_per_chan(:,iT) = dat;
-%         recog_trials_resp_all(cTrial, :) = dat;
 
         if trialLoad == 3
             im1seg = rippAll(image1Time-1000:image1Time+2e3);
@@ -494,8 +385,7 @@ for subj = 1:length(subj_list_full)
                          probeSeg];
         end
         
-        whole_trial_all(cTrial,:) = trialFull; % / mean(rippAll(baselineMask), 'omitnan');
-%         whole_trial_units_all(cTrial,:) = smoothdata(sum(unitTrialFullChan, 1, 'omitnan'), 'gaussian', 100) / size(unitTrialFullChan,1);
+        whole_trial_all(cTrial,:) = trialFull; 
         whole_trial_units_all(cTrial,:) = sum(unitTrialFullChan, 1) / size(unitTrialFullChan,1);
         
 
@@ -692,16 +582,6 @@ for subj = 1:length(subj_list_full)
             whole_trials_units_sm_region_all(cTrial, :, iR) = uTrialFullsm;
             whole_trials_units_region_all(cTrial, :, iR) = uTrialFull;
             
-%             whole_trials_BP_region_all(:,:,iR, 1)
-
-
-            
-             
-%             chRegion = find(chRegion); %convert to index
-%             for ii = 1:length(chRegion)
-%                 probeRipples = sum(rippMask(chRegion(ii),probeTime:probeTime+1250));
-%                 probe_trials_all{trialLoad,iR} = [probe_trials_all{trialLoad,iR}; [countChPerRegion(iR)+ii probeRipples]];
-%             end
             
             uRegion = find(uRegion); %convert to index
             for ii = 1:length(uRegion)
@@ -807,9 +687,6 @@ for subj = 1:length(subj_list_full)
     
     fprintf('number of total trials: %i, number of subject trials: %i \n\n', cTrial - 1, length(trials.start_time))
  
-
-%     save(fullfile(exportDir, 'ripDetections', sprintf('%s_rippleStats.mat', subject)), 'rippleStats' ,'-v7.3')
-
 end
 correct_trials_all(cTrial:end) = [];
 load_trials_all(cTrial:end) =[];
@@ -819,76 +696,10 @@ subjID(cTrial:end) = [];
 
 fprintf('done processing .. \n')
 toc
-profile off
 
-% [row, col] = find(isnan(recog_trials_all));
-% recog_trials_all_resp = nan(size(recog_trials_all,1), 1.5e3+1);
-% for iT = 1:size(recog_trials_all_resp,1)
-%     I = min(col(row == iT));
-%     if I  == 1; continue; end
-%     trial = recog_trials_all(iT, I-1500:I);
-%     recog_trials_all_resp(iT, 1:length(trial)) = trial;
-% 
-% 
-% end
 
 %%
 close all
-figure;
-for iR = 1:length(regions)
-%     figure;
-
-%     dat1 = probe_trials_units_all{1,iR};
-%     dat3 = probe_trials_units_all{3,iR};
-%     
-    dat1 = probe_trials_all{1,iR};
-    dat3 = probe_trials_all{3,iR};
-   
-    chRegion = unique(dat1(:,1));
-    P1 = []; P3 = []; P = [];
-    for ii = 1:length(chRegion)
-        ch = chRegion(ii);
-%         [H,P(ii),CI] = ttest2(dat1(dat1(:,1) == ch,2),dat3(dat3(:,1) == ch,2));
-        P1(ii) = mean(dat1(dat1(:,1) == ch,4), 'omitnan');
-        P3(ii) = mean(dat3(dat3(:,1) == ch,4), 'omitnan');
-        
-        [P(ii),H] = ranksum(dat1(dat1(:,1) == ch,4),dat3(dat3(:,1) == ch,4));
-        [H,P(ii),CI] = ttest2(dat1(dat1(:,1) == ch,4),dat3(dat3(:,1) == ch,4), 'tail', 'left');
-%         [stats, df, P(ii), surrog] = statcond({dat1(dat1(:,1) == ch,4)', dat3(dat3(:,1) == ch,4)'},'paired','off','tail', 'one', 'method', 'perm', 'naccu', 10000, 'verbose','off');
-    end
-    
-%     Pbundle1 = nan(1, length(subjs));
-%     Pbundle3 = nan(1, length(subjs));
-%     dat = whole_trials_region_all(:,:,iR);
-%     subjs = unique(subjID);
-%     for ii = 1:length(subjs)
-%         s = subjs(ii);
-%         dat1 = mean(dat(load_trials_all == 1 & subjID == s,taskMarkers(end)+1:taskMarkers(end)+1200),2);
-%         dat3 = mean(dat(load_trials_all == 3 & subjID == s,taskMarkers(end)+1:taskMarkers(end)+1200),2);
-%         Pbundle1(ii) = mean(dat1);
-%         Pbundle3(ii) = mean(dat3);
-%         if all(isnan(dat1)); continue; end
-%         [Pbundle(ii),H] = ranksum(dat1,dat3);
-%         plot(1,mean(dat1), 'o'); hold on;
-%         plot(3,mean(dat3), 'o'); hold on;
-%         plot([1 3],[mean(dat1) mean(dat3)], '-'); hold on;
-%     end
-%     
-%     sum(P3 > P1) / sum(~isnan(P1))
-%     sum(P < 0.05) / length(P)
-     fprintf('%i / %i \n', sum(P3 > P1) , length(P3))
-    subplot(1,5,iR)
-    
-    histogram([P3-P1]/mean(P1), 50);
-    vline(0)
-    
-   
-    
-    
-    
-    
-end
-
 
 baseSpikePerBund = [];
 baseRipDurPerBund = [];
@@ -953,14 +764,11 @@ for iR = 1:length(regions)+1
             if plot_condition(iT)
 
                 coR(iT, iR, 1) = std(whole_trial_all(iT, 1:taskMarkers(1)), 'omitnan');
-%                 coR(iT, iR, 1) = max(whole_trial_all(iT, 1:taskMarkers(1)));
                 coR(iT, iR, 2) = mean(whole_trial_all(iT, taskMarkers(1):taskMarkers(2)), 'omitnan');
                 coR(iT, iR, 3) = mean(whole_trial_all(iT, taskMarkers(2):taskMarkers(3)), 'omitnan');
                 coR(iT, iR, 4) = mean(whole_trial_all(iT, taskMarkers(3):taskMarkers(4)), 'omitnan');
                 coR(iT, iR, 5) = mean(whole_trial_all(iT, taskMarkers(4):taskMarkers(5)), 'omitnan');
-%                 coR(iT, iR, 6) = mean(whole_trial_all(iT, taskMarkers(5):taskMarkers(5)+1e3), 'omitnan');
                 coR(iT, iR, 6) = mean(whole_trial_all(iT, taskMarkers(5):taskMarkers(5)+1e3), 'omitnan');
-%                 coR(iT, iR, 6) = max(whole_trial_all(iT, taskMarkers(5):taskMarkers(5)+1e3));
 
                 FR(iT, iR, 1) = mean(whole_trial_units_all(iT, 1:taskMarkers(1)), 'omitnan');
                 FR(iT, iR, 2) = mean(whole_trial_units_all(iT, taskMarkers(1):taskMarkers(2)), 'omitnan');
@@ -971,13 +779,11 @@ for iR = 1:length(regions)+1
 
             else
                 coR(iT, iR, 1) = std(whole_trial_all(iT, 1:taskMarkers(1)), 'omitnan');
-%                 coR(iT, iR, 1) = max(whole_trial_all(iT, 1:taskMarkers(1)));
                 coR(iT, iR, 2) = mean(whole_trial_all(iT, taskMarkers(1):taskMarkers(2)), 'omitnan');
                 coR(iT, iR, 3) = nan;
                 coR(iT, iR, 4) = nan;
                 coR(iT, iR, 5) = mean(whole_trial_all(iT, taskMarkers(4):taskMarkers(5)), 'omitnan');
                 coR(iT, iR, 6) = mean(whole_trial_all(iT, taskMarkers(5):taskMarkers(5)+1e3), 'omitnan');
-%                 coR(iT, iR, 6) = max(whole_trial_all(iT, taskMarkers(5):taskMarkers(5)+1e3));
 
                 FR(iT, iR, 1) = mean(whole_trial_units_all(iT, 1:taskMarkers(1)), 'omitnan');
                 FR(iT, iR, 2) = mean(whole_trial_units_all(iT, taskMarkers(1):taskMarkers(2)), 'omitnan');
@@ -1021,8 +827,6 @@ for iR = 1:length(regions)+1
     end
     
     for iTm = [1,2,5,6]
-%         [pLoadCoR(iR, iTm),STATS] = ranksum(coR(plot_condition, iR, iTm), coR(~plot_condition, iR, iTm), 'tail', 'both');
-%         [pLoadFR(iR, iTm) ,STATS] = ranksum(FR(plot_condition, iR, iTm),   FR(~plot_condition, iR, iTm), 'tail', 'both');
         
         % load 3 vs load 1
         dat = coR(:, iR, iTm);
