@@ -1,4 +1,4 @@
-#Ripple Analysis for Working Memory Task
+# Ripple Analysis for Working Memory Task
 
 This repository contains MATLAB code for analyzing ripple oscillations in human intracranial EEG data during a Sternberg working memory task. The analysis includes ripple detection, characterization, co-occurrence analysis across brain regions, and single-trial visualization.
 
