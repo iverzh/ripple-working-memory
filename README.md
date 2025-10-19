@@ -308,6 +308,7 @@ If you use this code in your research, please cite:
 Verzhbinsky, I. A., Daume, J., Rutishauser, U., & Halgren, E. (2025). 
 Cross-region neuron co-firing mediated by ripple oscillations supports 
 distributed working memory representations. bioRxiv, 2025-09.
+https://www.biorxiv.org/content/10.1101/2025.09.04.674061v1
 ```
 
 **For the source dataset (DANDI 000673):**
