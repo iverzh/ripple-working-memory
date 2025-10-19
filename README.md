@@ -1,12 +1,12 @@
-ipple Analysis for Working Memory Task
+#Ripple Analysis for Working Memory Task
 
 This repository contains MATLAB code for analyzing ripple oscillations in human intracranial EEG data during a Sternberg working memory task. The analysis includes ripple detection, characterization, co-occurrence analysis across brain regions, and single-trial visualization.
 
 ## Data Availability
 
-All data analyzed in this repository are **publicly available** through the DANDI Archive:
+All data analyzed in this repository are from a previously published  **publicly available** through the DANDI Archive:
 
-**DANDI Dataset 000673**: *Control of working memory by phase?amplitude coupling of human hippocampal neurons*
+**DANDI Dataset 000673**: *Control of working memory by phase amplitude coupling of human hippocampal neurons*
 - **URL**: https://dandiarchive.org/dandiset/000673
 - **Contents**: 
   - Local field potential (LFP) recordings from human intracranial electrodes
@@ -179,6 +179,7 @@ You'll need to extract these from NWB files and convert to the MATLAB formats de
 ```
 
 #### 2. Ripple Statistics Files
+Output from [ripple detection pipeline](https://github.com/iverzh/ripple-detection)
 ```matlab
 % File: <subject>_ripple_stats_wake_NC_1kHz_template_z25.mat
 % Variables in rippleStats structure:
@@ -186,7 +187,7 @@ You'll need to extract these from NWB files and convert to the MATLAB formats de
 %   - window: {1 × channels} cell array of [start, end] times
 %   - duration: {1 × channels} cell array of ripple durations (ms)
 %   - oscFreq: {1 × channels} cell array of oscillation frequencies (Hz)
-%   - rippleAmp: {1 × channels} cell array of ripple amplitudes (?V)
+%   - rippleAmp: {1 × channels} cell array of ripple amplitudes (uV)
 %   - density: {1 × channels} cell array of ripple density (events/min)
 %   - chanLabels: {1 × channels} cell array of channel labels
 %   - recordingLength: total recording length (samples)
@@ -304,14 +305,16 @@ If you use this code in your research, please cite:
 
 **For this analysis code:**
 ```
-Verzhbinsky, I. A., Daume, J., Rutishauser, U., & Halgren, E. (2025). Cross-region neuron co-firing mediated by ripple oscillations supports distributed working memory representations. bioRxiv, 2025-09.
+Verzhbinsky, I. A., Daume, J., Rutishauser, U., & Halgren, E. (2025). 
+Cross-region neuron co-firing mediated by ripple oscillations supports 
+distributed working memory representations. bioRxiv, 2025-09.
 ```
 
 **For the source dataset (DANDI 000673):**
 ```
 Daume, J., Kami?ski, J., Schjetnan, A. G. P., Salimpour, Y., Khan, U., 
 Kalia, S. K., Valiante, T. A., Anderson, A., Mamelak, A. N., & Rutishauser, U. 
-Control of working memory by phase?amplitude coupling of human hippocampal neurons. 
+Control of working memory by phase-amplitude coupling of human hippocampal neurons. 
 Nature (2024). https://doi.org/10.1038/s41586-024-07309-z
 
 Dataset available at: https://dandiarchive.org/dandiset/000673
