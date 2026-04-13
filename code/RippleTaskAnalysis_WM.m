@@ -1483,9 +1483,9 @@ for iRa = 1:length(regions)
         hl.LineWidth = 0.5;
         
         % Calculate co-ripple rates for different task periods
-        coRresp = mean(whole_trials_cross_region_all_bin{iRa,iRb}(:,taskMarkers(end):taskMarkers(end)+1.0e3), 2, 'omitnan');
-        coRmaintenance = mean(whole_trials_cross_region_all_bin{iRa,iRb}(:,taskMarkers(end-1):taskMarkers(end)), 2, 'omitnan');
-        coRbaseline = mean(whole_trials_cross_region_all_bin{iRa,iRb}(:,1:taskMarkers(1)), 2, 'omitnan');
+        coRresp = mean(whole_trials_cross_region_all{iRa,iRb}(:,taskMarkers(end):taskMarkers(end)+1.0e3), 2, 'omitnan');
+        coRmaintenance = mean(whole_trials_cross_region_all{iRa,iRb}(:,taskMarkers(end-1):taskMarkers(end)), 2, 'omitnan');
+        coRbaseline = mean(whole_trials_cross_region_all{iRa,iRb}(:,1:taskMarkers(1)), 2, 'omitnan');
         
         % Remove excess trials
         coRresp(cTrial:end) = [];
