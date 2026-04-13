@@ -63,6 +63,11 @@ recog_trials_units_resp_all = nan(maxTrials, length(winResp(1):winResp(2)));
 whole_trial_all = nan(maxTrials, winLength);
 whole_trial_units_all = nan(maxTrials, winLength);
 
+% Channel-normalized copies of all-channel ripple arrays (per-channel rates)..
+recog_trials_all_norm      = nan(maxTrials, length(win(1):win(2)));
+recog_trials_resp_all_norm = nan(maxTrials, length(winResp(1):winResp(2)));
+whole_trial_all_norm       = nan(maxTrials, winLength);
+
 % Region-specific arrays
 whole_trials_region_all = nan(maxTrials, winLength, length(regions));
 resp_region_all = nan(maxTrials, length(winResp(1):winResp(2)), length(regions));
@@ -71,9 +76,19 @@ whole_trials_region_all_shuff = nan(maxTrials, winLength, length(regions));
 whole_trials_units_sm_region_all = nan(maxTrials, winLength, length(regions));
 whole_trials_units_region_all = nan(maxTrials, winLength, length(regions));
 
+% Channel-normalized copies of region-specific ripple arrays
+whole_trials_region_all_norm       = nan(maxTrials, winLength, length(regions));
+whole_trials_region_all_shuff_norm = nan(maxTrials, winLength, length(regions));
+resp_region_all_norm               = nan(maxTrials, length(winResp(1):winResp(2)), length(regions));
+
 % Cross-region arrays
 whole_trials_cross_region_all = cell(length(regions));
 whole_trials_cross_region_all_shuff = cell(length(regions));
+% Binary "any-channel rippling" cross-region cells: per-region signal is
+% collapsed to {0,1} based on whether ANY channel in that region has a
+% ripple at this ms.
+whole_trials_cross_region_all_bin       = cell(length(regions));
+whole_trials_cross_region_all_shuff_bin = cell(length(regions));
 probe_trials_units_all = cell(3, length(regions));  % 3 load conditions
 probe_trials_all = cell(3, length(regions));
 whole_trials_unit_cross_region_all = cell(length(regions), length(regions), 3);
@@ -83,6 +98,8 @@ for iRa = 1:length(regions)
     for iRb = iRa:length(regions)
         whole_trials_cross_region_all{iRa, iRb} = nan(maxTrials, winLength);       
         whole_trials_cross_region_all_shuff{iRa, iRb} = nan(maxTrials, winLength);       
+        whole_trials_cross_region_all_bin{iRa, iRb}       = nan(maxTrials, winLength);
+        whole_trials_cross_region_all_shuff_bin{iRa, iRb} = nan(maxTrials, winLength);
         for ii = 1:size(whole_trials_unit_cross_region_all,3)
             whole_trials_unit_cross_region_all{iRa, iRb,ii} = nan(maxTrials, winLength);
         end
@@ -497,6 +514,13 @@ for subj = 1:length(subj_list_full)
             resp_units_region_all(cTrial, :, iR) = u_dat_region_sm{iR}(respTime+winResp(1):respTime+winResp(2));
             whole_trials_units_sm_region_all(cTrial, :, iR) = uTrialFullsm;
             whole_trials_units_region_all(cTrial, :, iR) = uTrialFull;
+
+            % Channel-normalized region copies (per-channel ripple rate)
+            if nChRegions(cTrial, iR) > 0
+                whole_trials_region_all_norm(cTrial, :, iR) = trialFull / nChRegions(cTrial, iR);
+                resp_region_all_norm(cTrial, :, iR) = ...
+                    dat_region{iR}(respTime+winResp(1):respTime+winResp(2)) / nChRegions(cTrial, iR);
+            end
             
             % Calculate unit and ripple rates for baseline, maintenance, and probe periods
             uRegion = find(uRegion);  % Convert to indices
@@ -517,7 +541,16 @@ for subj = 1:length(subj_list_full)
                     [countChPerRegion(iR)+ii baslnRipples maintRipples probeRipples]];
             end
         end
-        
+
+        % Channel-normalized all-channel ripple time-series for this trial.
+        % Total channel count across regions of interest = sum over nChRegions row.
+        nChTotalTrial = sum(nChRegions(cTrial, :));
+        if nChTotalTrial > 0
+            whole_trial_all_norm(cTrial, :)       = whole_trial_all(cTrial, :)       / nChTotalTrial;
+            recog_trials_all_norm(cTrial, :)      = recog_trials_all(cTrial, :)      / nChTotalTrial;
+            recog_trials_resp_all_norm(cTrial, :) = recog_trials_resp_all(cTrial, :) / nChTotalTrial;
+        end
+
         % Calculate cross-region co-rippling
         for iRa = 1:length(regions)
             for iRb = iRa:length(regions)
@@ -542,6 +575,25 @@ for subj = 1:length(subj_list_full)
                     datAB = datAripShuff + datBripShuff;
                     datAB(datAripShuff <= 0 | datBripShuff <= 0) = 0;
                     whole_trials_cross_region_all_shuff{iRa, iRb}(cTrial, :) = datAB;
+                end
+
+                % Binary "any-channel rippling" cross-region indicator:
+                % collapse each region to {0,1} (1 if any channel rippling
+                % at this ms), preserving NaN gaps; combine across regions
+                % with logical AND.
+                datAbin = double(datArip > 0); datAbin(isnan(datArip)) = nan;
+                datBbin = double(datBrip > 0); datBbin(isnan(datBrip)) = nan;
+                if iRa == iRb
+                    whole_trials_cross_region_all_bin{iRa, iRb}(cTrial, :) = datAbin;
+                else
+                    whole_trials_cross_region_all_bin{iRa, iRb}(cTrial, :) = datAbin .* datBbin;
+                end
+                datAbinShuff = double(datAripShuff > 0); datAbinShuff(isnan(datAripShuff)) = nan;
+                datBbinShuff = double(datBripShuff > 0); datBbinShuff(isnan(datBripShuff)) = nan;
+                if iRa == iRb
+                    whole_trials_cross_region_all_shuff_bin{iRa, iRb}(cTrial, :) = datAbinShuff;
+                else
+                    whole_trials_cross_region_all_shuff_bin{iRa, iRb}(cTrial, :) = datAbinShuff .* datBbinShuff;
                 end
                 
                 % Find overlapping units and channels between regions
@@ -909,7 +961,6 @@ savepdf(gcf, fullfile(exportDirFigs, sprintf('FiringTaskWithinRegionsBoxPlot_%s.
 
 
 
-close all
 
 %% Initialize visualization parameters
 taskMarkers = [500 2600 4700 6800 9400] + 500;  % Task event markers
@@ -945,7 +996,7 @@ plot_data = smoothdata(recog_trials_resp_all(plot_condition,:), 2, 'gaussian', s
 bf.FaceAlpha = 0.7;
 vline(0)
 xlim([win(1) win(2)])
-ylabel('Ripple rate')
+ylabel('Ripple rate per channel')
 title('Response-locked activity')
 
 % Subplot 2: Response time distributions
@@ -1001,7 +1052,7 @@ condTrial1 = find(plot_condition, 1, 'first');
 condTrial2 = find(plot_condition_2, 1, 'first');
 
 % Plot slow response trials
-plot_data = smoothdata(whole_trial_all(plot_condition,:), 2, 'gaussian', 100);
+plot_data = smoothdata(whole_trial_all_norm(plot_condition,:), 2, 'gaussian', 100);
 plot_data_mu = mean(plot_data, 'omitnan');
 plot_data_sem = std(plot_data, 'omitnan')/sqrt(sum(plot_condition));
 plot_data_mu(isnan(whole_trial_all(condTrial1,:))) = nan;
@@ -1012,7 +1063,7 @@ hold on;
 bf.FaceAlpha = 0.7;
 
 % Plot fast response trials
-plot_data = smoothdata(whole_trial_all(plot_condition_2,:), 2, 'gaussian', 100);
+plot_data = smoothdata(whole_trial_all_norm(plot_condition_2,:), 2, 'gaussian', 100);
 plot_data_mu = mean(plot_data, 'omitnan');
 plot_data_sem = std(plot_data, 'omitnan')/sqrt(sum(plot_condition_2));
 plot_data_mu(isnan(whole_trial_all(condTrial2,:))) = nan;
@@ -1024,14 +1075,14 @@ bf.FaceAlpha = 0.7;
 % Add task markers and baseline reference
 vl = vline([500 2600 4700 6800 9400]-500);
 for iV = 1:length(vl); vl(iV).LineWidth = 1.5; end
-hl = hline(mean(whole_trial_all(:,1:1e3), 'all', 'omitnan'));
+hl = hline(mean(whole_trial_all_norm(:,1:1e3), 'all', 'omitnan'));
 hl.Color = 'k';
 hl.LineStyle = '-';
 hl.LineWidth = 0.5;
 xlim([-1e3 max(taskMarkers) + 2e3])
 fig = gcf;
 fig.Color = 'w';
-ylabel('Co-ripples')
+ylabel('Co-ripples per channel')
 xlabel('Time from trial start (ms)')
 savepdf(gcf, fullfile(exportDirFigs, sprintf('coRipTask_allChannels_load_%s.pdf', tag)))
 
@@ -1081,7 +1132,7 @@ condTrial1 = find(plot_condition, 1, 'first');
 condTrial2 = find(~plot_condition, 1, 'first');
 
 % Plot probe-in trials
-plot_data = smoothdata(whole_trial_all(plot_condition,:), 2, 'gaussian', 200);
+plot_data = smoothdata(whole_trial_all_norm(plot_condition,:), 2, 'gaussian', 200);
 plot_data_mu = mean(plot_data, 'omitnan');
 plot_data_sem = std(plot_data, 'omitnan')/sqrt(sum(plot_condition));
 plot_data_mu(isnan(whole_trial_all(condTrial1,:))) = nan;
@@ -1092,7 +1143,7 @@ hold on;
 bf.FaceAlpha = 0.7;
 
 % Plot probe-out trials
-plot_data = smoothdata(whole_trial_all(~plot_condition,:), 2, 'gaussian', 200);
+plot_data = smoothdata(whole_trial_all_norm(~plot_condition,:), 2, 'gaussian', 200);
 plot_data_mu = mean(plot_data, 'omitnan');
 plot_data_sem = std(plot_data, 'omitnan')/sqrt(sum(~plot_condition));
 plot_data_mu(isnan(whole_trial_all(condTrial2,:))) = nan;
@@ -1106,14 +1157,14 @@ bf.FaceAlpha = 0.25;
 % Add markers
 vl = vline([500 2600 4700 6800 9400]-500);
 for iV = 1:length(vl); vl(iV).LineWidth = 1.5; end
-hl = hline(mean(whole_trial_all(:,1:1e3), 'all', 'omitnan'));
+hl = hline(mean(whole_trial_all_norm(:,1:1e3), 'all', 'omitnan'));
 hl.Color = 'k';
 hl.LineStyle = '-';
 hl.LineWidth = 0.5;
 xlim([-1e3 max(taskMarkers) + 2e3])
 fig = gcf;
 fig.Color = 'w';
-ylabel('Co-ripples')
+ylabel('Co-ripples per channel')
 xlabel('Time from trial start (ms)')
 savepdf(gcf, fullfile(exportDirFigs, sprintf('coRipTask_allChannels_probe_%s.pdf', tag)))
 
@@ -1131,7 +1182,7 @@ for iR = 1:length(regions)
     subplot(5,1,iR)
     
     % Fast response trials
-    plot_data_1 = whole_trials_region_all(plot_condition_2,:,iR);
+    plot_data_1 = whole_trials_region_all_norm(plot_condition_2,:,iR);
     plot_data_mu_1 = mean(plot_data_1, 'omitnan');
     plot_data_sem = std(plot_data_1, 'omitnan')/sqrt(sum(~isnan(plot_data_1(:,1))));
     plot_data_mu_1 = smoothdata(plot_data_mu_1, 2, 'gaussian', 100);
@@ -1144,7 +1195,7 @@ for iR = 1:length(regions)
     bf.FaceAlpha = 0.7;
     
     % Slow response trials
-    plot_data_3 = whole_trials_region_all(plot_condition,:,iR);
+    plot_data_3 = whole_trials_region_all_norm(plot_condition,:,iR);
     plot_data_mu_3 = mean(plot_data_3, 'omitnan');
     plot_data_sem = std(plot_data_3, 'omitnan')/sqrt(sum(~isnan(plot_data_3(:,1))));
     plot_data_mu_3 = smoothdata(plot_data_mu_3, 2, 'gaussian', 100);
@@ -1188,7 +1239,7 @@ for iR = 1:length(regions)
     vl = vline([500 2600 4700 6800 9400]-500);
     for iV = 1:length(vl); vl(iV).LineWidth = 1.0; end
     
-    ylabel('Co-ripples')
+    ylabel('Co-ripples per channel')
     if iR == length(regions); xlabel('Time from trial start (ms)'); end
     
     ax = gca;
@@ -1210,7 +1261,7 @@ for iR = 1:length(regions)
     baseline = nan(6500,1);
     for iS = 1:max(subjID)
         ii = find(subjID == iS);
-        baseline(ii) = mean(whole_trials_region_all(ii,1:1e3,iR), 'all', 'omitnan');
+        baseline(ii) = mean(whole_trials_region_all_norm(ii,1:1e3,iR), 'all', 'omitnan');
     end
     
     % Low load trials
@@ -1390,7 +1441,7 @@ for iRa = 1:length(regions)
         subplot(5,5,c)
         
         % Low load trials
-        plot_data_1 = whole_trials_cross_region_all{iRa,iRb}(~plot_condition,:);
+        plot_data_1 = whole_trials_cross_region_all_bin{iRa,iRb}(~plot_condition,:);
         plot_data_mu_1 = mean(plot_data_1, 'omitnan');
         plot_data_sem = std(plot_data_1, 'omitnan')/sqrt(sum(~plot_condition));
         plot_data_mu_1 = smoothdata(plot_data_mu_1, 'gaussian', 100);
@@ -1404,7 +1455,7 @@ for iRa = 1:length(regions)
         bl2.LineWidth = 0.5;
         
         % High load trials
-        plot_data_3 = whole_trials_cross_region_all{iRa,iRb}(plot_condition,:);
+        plot_data_3 = whole_trials_cross_region_all_bin{iRa,iRb}(plot_condition,:);
         plot_data_mu_3 = mean(plot_data_3, 'omitnan');
         plot_data_sem = std(plot_data_3, 'omitnan')/sqrt(sum(plot_condition));
         plot_data_mu_3 = smoothdata(plot_data_mu_3, 'gaussian', 100);
@@ -1432,9 +1483,9 @@ for iRa = 1:length(regions)
         hl.LineWidth = 0.5;
         
         % Calculate co-ripple rates for different task periods
-        coRresp = mean(whole_trials_cross_region_all{iRa,iRb}(:,taskMarkers(end):taskMarkers(end)+1.0e3), 2, 'omitnan');
-        coRmaintenance = mean(whole_trials_cross_region_all{iRa,iRb}(:,taskMarkers(end-1):taskMarkers(end)), 2, 'omitnan');
-        coRbaseline = mean(whole_trials_cross_region_all{iRa,iRb}(:,1:taskMarkers(1)), 2, 'omitnan');
+        coRresp = mean(whole_trials_cross_region_all_bin{iRa,iRb}(:,taskMarkers(end):taskMarkers(end)+1.0e3), 2, 'omitnan');
+        coRmaintenance = mean(whole_trials_cross_region_all_bin{iRa,iRb}(:,taskMarkers(end-1):taskMarkers(end)), 2, 'omitnan');
+        coRbaseline = mean(whole_trials_cross_region_all_bin{iRa,iRb}(:,1:taskMarkers(1)), 2, 'omitnan');
         
         % Remove excess trials
         coRresp(cTrial:end) = [];
@@ -1461,7 +1512,7 @@ for iRa = 1:length(regions)
         fprintf('%s <--> %s ripples maintenance %.2f%%\n', regions{iRa}, regions{iRb}, pct*100)
         
         % Format subplot
-        if iRa == 1; ylabel('Co-ripples'); end
+        if iRa == 1; ylabel('P(any-channel co-ripple)'); end
         if iRb == length(regions); xlabel('Time (ms)'); end
         
         plotMarkers = [500 2600 4700 6800 9400]-500;
@@ -1530,20 +1581,3 @@ box off
 fig = gcf;
 fig.Color = 'w';
 savepdf(gcf, fullfile(exportDirFigs, sprintf('AcrossRegionsBar_stats_%s.pdf', tag)))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
