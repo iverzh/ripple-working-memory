@@ -13,9 +13,8 @@ clc
 clear
 
 %% Initialize paths and directories
-addpath(genpath('/space/seh10/6/halgdev/projects/iverzh/ripples/code/UtahArray'))
-addpath(genpath('/space/seh10/6/halgdev/projects/iverzh/ripples/code/util'))
-addpath(genpath('/space/seh10/6/halgdev/projects/iverzh/ripples/code/eeglab2022.0/functions/'))
+addpath(genpath('/space/seh10/6/halgdev/projects/iverzh/ripples/code/ripple-working-memory/code'))
+
 
 % Define data directories
 dataDirectory = '/space/seh10/6/halgdev/projects/iverzh/data/Sternberg/preprocess/OrigUpload';
@@ -592,93 +591,6 @@ toc
 regionColors = brewermap(12, 'Dark2');
 contraColor = brewermap(12, 'Accent');
 
-%% Helper Function: Aggregate Data Across Region Pairs
-function [replay_match, replay_mismatch, replay_norip_match, replay_norip_mismatch, ...
-          coRap_total, coRap_mm_total, noRap_total, noRap_mm_total, ...
-          coRdur_total, coRdur_mm_total, noRdur_total, noRdur_mm_total] = ...
-          aggregateRegionData(regions, regionsPlot, targetRegions, coRcoF, coRcoF_mm, ...
-                              noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
-                              coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay, ...
-                              sameHemisphere)
-    
-    % Get indices for target regions
-    iRapl = find(contains(regions, regionsPlot(targetRegions)));
-    iRbpl = iRapl;
-    
-    % Initialize accumulators
-    replay_match = zeros(2, 1);
-    replay_mismatch = zeros(2, 1);
-    replay_norip_match = zeros(2, 1);
-    replay_norip_mismatch = zeros(2, 1);
-    
-    coRap_total = 0;
-    coRap_mm_total = 0;
-    noRap_total = 0;
-    noRap_mm_total = 0;
-    
-    coRdur_total = 0;
-    coRdur_mm_total = 0;
-    noRdur_total = 0;
-    noRdur_mm_total = 0;
-    
-    % Loop through region pairs
-    for Aloop = iRapl
-        for Bloop = iRbpl
-            if all(ismember(iRapl, iRbpl))
-                iiA = Aloop;
-                iiB = Bloop;
-            else
-                iiA = min([Aloop Bloop]);
-                iiB = max([Aloop Bloop]);
-            end
-            
-            if sum(coR_replay(:, iiA, iiB)) == 0; continue; end
-            
-            % Check hemisphere constraint if specified
-            if nargin >= 17 && ~isempty(sameHemisphere)
-                if strcmp(regions{iiA}(1), regions{iiB}(1)) ~= sameHemisphere
-                    continue
-                end
-            end
-            
-            % Aggregate matched trials
-            dat = [sum(coRcoF(:, 1, iiA, iiB) > 0 & coRcoF(:, 2, iiA, iiB) > 0); ...
-                   sum(coRcoF(:, 1, iiA, iiB) == 0 | coRcoF(:, 2, iiA, iiB) == 0)];
-            replay_match = replay_match + dat;
-            
-            % Aggregate mismatched trials
-            dat = [sum(coRcoF_mm(:, 1, iiA, iiB) > 0 & coRcoF_mm(:, 2, iiA, iiB) > 0); ...
-                   sum(coRcoF_mm(:, 1, iiA, iiB) == 0 | coRcoF_mm(:, 2, iiA, iiB) == 0)];
-            replay_mismatch = replay_mismatch + dat;
-            
-            % Aggregate no-ripple controls (average across iterations)
-            dat = [];
-            for iter = 1:25
-                dat = [dat, [sum(noRcoF(:, 1, iiA, iiB, iter) > 0 & noRcoF(:, 2, iiA, iiB, iter) > 0); ...
-                            sum(noRcoF(:, 1, iiA, iiB, iter) == 0 | noRcoF(:, 2, iiA, iiB, iter) == 0)]];
-            end
-            replay_norip_match = replay_norip_match + round(mean(dat, 2));
-            
-            dat = [];
-            for iter = 1:25
-                dat = [dat, [sum(noRcoF_mm(:, 1, iiA, iiB, iter) > 0 & noRcoF_mm(:, 2, iiA, iiB, iter) > 0); ...
-                            sum(noRcoF_mm(:, 1, iiA, iiB, iter) == 0 | noRcoF_mm(:, 2, iiA, iiB, iter) == 0)]];
-            end
-            replay_norip_mismatch = replay_norip_mismatch + round(mean(dat, 2));
-            
-            % Aggregate co-firing rates
-            coRap_total = coRap_total + sum(coRap(:, :, iiA, iiB), 'all');
-            coRap_mm_total = coRap_mm_total + sum(coRap_mm(:, :, iiA, iiB), 'all');
-            noRap_total = noRap_total + sum(noRap(:, :, iiA, iiB), 'all');
-            noRap_mm_total = noRap_mm_total + sum(noRap_mm(:, :, iiA, iiB), 'all');
-            
-            coRdur_total = coRdur_total + sum(coRdur(:, :, iiA, iiB), 'all');
-            coRdur_mm_total = coRdur_mm_total + sum(coRdur_mm(:, :, iiA, iiB), 'all');
-            noRdur_total = noRdur_total + sum(noRdur(:, :, iiA, iiB), 'all');
-            noRdur_mm_total = noRdur_mm_total + sum(noRdur_mm(:, :, iiA, iiB), 'all');
-        end
-    end
-end
 
 %% Figure 1: Main Replay Analysis - AMY, HIP, Ipsilateral, Contralateral
 load('/space/seh10/6/halgdev/projects/iverzh/data/Sternberg/preprocess/regionLocations.mat')
@@ -696,6 +608,8 @@ iRa = 4; % AMY
     aggregateRegionData(regions, regionsPlot, iRa, [1:3], coRcoF, coRcoF_mm, ...
                         noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
                         coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay);
+                    
+
 
 % Calculate firing rates
 coR_fr = coRap_pl / coRdur_pl * 1e3;
@@ -821,7 +735,7 @@ ax.LineWidth = 1;
 [coR_replay_pl, coR_replay_mm_pl, noR_replay_pl, noR_replay_mm_pl, ...
  coRap_pl, coRap_mm_pl, noRap_pl, noRap_mm_pl, ...
  coRdur_pl, coRdur_mm_pl, noRdur_pl, noRdur_mm_pl] = ...
-    aggregateRegionData(regions, regionsPlot, [1:5], coRcoF, coRcoF_mm, ...
+    aggregateRegionData(regions, regionsPlot, [1:5],[1:5], coRcoF, coRcoF_mm, ...
                         noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
                         coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay, true);
 
@@ -882,7 +796,7 @@ ax.LineWidth = 1;
 [coR_replay_pl, coR_replay_mm_pl, noR_replay_pl, noR_replay_mm_pl, ...
  coRap_pl, coRap_mm_pl, noRap_pl, noRap_mm_pl, ...
  coRdur_pl, coRdur_mm_pl, noRdur_pl, noRdur_mm_pl] = ...
-    aggregateRegionData(regions, regionsPlot, [1:5], coRcoF, coRcoF_mm, ...
+    aggregateRegionData(regions, regionsPlot, [1:5], [1:5], coRcoF, coRcoF_mm, ...
                         noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
                         coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay, false);
 
@@ -946,9 +860,3 @@ adj_p = nan(size(pValue));
 
 savepdf(gcf, fullfile(exportDirFigs, sprintf('coRipReplay_%s.pdf', tag)))
 
-%% Compare Effect Sizes
-results = compare_chi_squared_effect_sizes(chi2stat1, sum(expected1(:)), 2, 2, ...
-                                           chi2stat2, sum(expected2(:)), 2, 2);
-
-fprintf('\n=== REPLAY ANALYSIS COMPLETE ===\n')
-fprintf('Results saved to: %s\n', exportDirFigs)
