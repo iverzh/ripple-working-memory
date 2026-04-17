@@ -512,7 +512,7 @@ for iRa = 1:length(regionsPlot)
         subplot(5, 5, c)
         
         % Filter pairs with sufficient activity
-        keep = coR(2, :) > thresh | coR(3, :) > thresh | coR(4, :) > thresh;
+        keep = (base(1,:) > thresh) & (base(2,:) > thresh | base(3,:) > thresh | base(4,:) > thresh);
         keepAll{iRa, iRb} = keep;
         Npair(iRa, iRb) = sum(keep);
         
