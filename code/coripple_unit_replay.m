@@ -123,6 +123,7 @@ noRap = zeros(2, 2, length(regions), length(regions)); % Non-ripple action poten
 % Trial-wise data
 loads = nan(5e5, length(regions), length(regions)); % Memory load per trial
 respTimes = nan(5e5, length(regions), length(regions)); % Response times
+subjID = nan(5e5, length(regions),length(regions)); %subject / session identifier
 coRcoF = nan(5e5, 2, length(regions), length(regions)); % Co-ripple co-firing
 noRcoF = nan(5e5, 2, length(regions), length(regions), nIterations); % Non-ripple co-firing (bootstrapped)
 coRcoFShuff = nan(5e5, 2, length(regions), length(regions)); % Shuffled control
@@ -141,11 +142,7 @@ noRcoFCount = ones(length(regions), length(regions), nIterations);
 noRcoF_mmCount = ones(length(regions), length(regions), nIterations);
 
 % Subject tracking
-subjID = nan(6.5e3, 1);
-correct_trials_all = nan(6.5e3, 1);
-load_trials_all = nan(6.5e3, 1);
-probe_in_out = nan(6.5e3, 1);
-respLatency = nan(6.5e3, 1);
+
 densityAll = [];
 uChanAll = [];
 
@@ -403,6 +400,7 @@ for subj = 1:length(subj_list_full)
                                 coRcoF(ii, 2, iRa, iRb) = coFe;
                                 loads(ii, iRa, iRb) = trialLoad;
                                 respTimes(ii, iRa, iRb) = respTime - probeTime;
+                                subjID(ii,iRa, iRb) = subj;
                                 
                                 % Count replay events
                                 if coFp > 0 && coFe > 0
@@ -575,14 +573,11 @@ for subj = 1:length(subj_list_full)
     end % End seed region loop
 end % End subject loop
 
-% Clean up unused array elements
-correct_trials_all(cTrial:end) = [];
-load_trials_all(cTrial:end) = [];
-probe_in_out(cTrial:end) = [];
-subjID(cTrial:end) = [];
+
 
 fprintf('Done processing.\n')
 toc
+
 
 %% ========================================================================
 %  VISUALIZATION: REPLAY ANALYSIS RESULTS
@@ -600,26 +595,42 @@ bW = 1.1;
 figure('Position', [1191 647 608 638]);
 ha = tight_subplot(2, 2, [0.25, 0.15], [.05 .05], [.15 .15]);
 
-%% Panel 1: AMY to Frontal
-iRa = 4; % AMY
-[coR_replay_pl, coR_replay_mm_pl, noR_replay_pl, noR_replay_mm_pl, ...
- coRap_pl, coRap_mm_pl, noRap_pl, noRap_mm_pl, ...
- coRdur_pl, coRdur_mm_pl, noRdur_pl, noRdur_mm_pl] = ...
-    aggregateRegionData(regions, regionsPlot, iRa, [1:3], coRcoF, coRcoF_mm, ...
-                        noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
-                        coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay);
-                    
+% Shared input for aggregateRegionData (panel-specific fields set below)
+in_base = struct();
+in_base.regions     = regions;     % region labels (cell array, per channel)
+in_base.regionsPlot = regionsPlot; % region groups to query against `regions`
+in_base.coRcoF      = coRcoF;      % co-ripple co-firing counts, matched trials
+in_base.coRcoF_mm   = coRcoF_mm;   % co-ripple co-firing counts, mismatched trials
+in_base.noRcoF      = noRcoF;      % no-ripple control co-firing counts, matched
+in_base.noRcoF_mm   = noRcoF_mm;   % no-ripple control co-firing counts, mismatched
+in_base.coRap       = coRap;       % co-ripple action-potential counts, matched
+in_base.coRap_mm    = coRap_mm;    % co-ripple AP counts, mismatched
+in_base.noRap       = noRap;       % no-ripple control AP counts, matched
+in_base.noRap_mm    = noRap_mm;    % no-ripple control AP counts, mismatched
+in_base.coRdur      = coRdur;      % co-ripple durations (ms), matched
+in_base.coRdur_mm   = coRdur_mm;   % co-ripple durations, mismatched
+in_base.noRdur      = noRdur;      % no-ripple control durations, matched
+in_base.noRdur_mm   = noRdur_mm;   % no-ripple control durations, mismatched
+in_base.coR_replay  = coR_replay;  % co-ripple replay mask per region pair
 
+% Panel 1: AMY to Frontal
+iRa = 4; % AMY
+in = in_base;
+in.targetRegionsA = iRa;       % AMY
+in.targetRegionsB = [1:3];     % Frontal group
+in.respTimes      = respTimes; % trial response times for fast/slow split
+in.loads          = loads;     % memory load per trial (for load-filtered median)
+out = aggregateRegionData(in);
 
 % Calculate firing rates
-coR_fr = coRap_pl / coRdur_pl * 1e3;
-coR_mm_fr = coRap_mm_pl / coRdur_mm_pl * 1e3;
-noR_fr = noRap_pl / noRdur_pl * 1e3;
-noR_mm_fr = noRap_mm_pl / noRdur_mm_pl * 1e3;
+coR_fr    = out.coRap_total    / out.coRdur_total    * 1e3;
+coR_mm_fr = out.coRap_mm_total / out.coRdur_mm_total * 1e3;
+noR_fr    = out.noRap_total    / out.noRdur_total    * 1e3;
+noR_mm_fr = out.noRap_mm_total / out.noRdur_mm_total * 1e3;
 
 X = [1:4];
-Y = [coR_replay_pl(1)/sum(coR_replay_pl), coR_replay_mm_pl(1)/sum(coR_replay_mm_pl), ...
-     noR_replay_pl(1)/sum(noR_replay_pl), noR_replay_mm_pl(1)/sum(noR_replay_mm_pl)] * 100;
+Y = [out.replay_match(1)/sum(out.replay_match), out.replay_mismatch(1)/sum(out.replay_mismatch), ...
+     out.replay_norip_match(1)/sum(out.replay_norip_match), out.replay_norip_mismatch(1)/sum(out.replay_norip_mismatch)] * 100;
 
 axes(ha(1))
 yyaxis left
@@ -659,32 +670,30 @@ ax.YAxis(2).FontSize = 11;
 ax.LineWidth = 1;
 
 % Statistical test
-[chi2stat, pValue(1, 1), expected] = chiSquaredTest([[coR_replay_pl(1), coR_replay_pl(2)]; ...
-                                                      [coR_replay_mm_pl(1), coR_replay_mm_pl(2)]]);
-[chi2stat, pValue(1, 2), expected] = chiSquaredTest([[noR_replay_pl(1), noR_replay_pl(2)]; ...
-                                                      [noR_replay_mm_pl(1), noR_replay_mm_pl(2)]]);
-[chi2stat, pValue(1, 3), expected] = chiSquaredTest([[sum([coR_replay_pl(1), coR_replay_mm_pl(1)]), ...
-                                                       sum([coR_replay_pl(2), coR_replay_mm_pl(2)])]; ...
-                                                      [sum([noR_replay_pl(1), noR_replay_mm_pl(1)]), ...
-                                                       sum([noR_replay_pl(2), noR_replay_mm_pl(2)])]]);
+[chi2stat, pValue(1, 1), expected] = chiSquaredTest([[out.replay_match(1),       out.replay_match(2)]; ...
+                                                      [out.replay_mismatch(1),    out.replay_mismatch(2)]]);
+[chi2stat, pValue(1, 2), expected] = chiSquaredTest([[out.replay_norip_match(1), out.replay_norip_match(2)]; ...
+                                                      [out.replay_norip_mismatch(1), out.replay_norip_mismatch(2)]]);
+[chi2stat, pValue(1, 3), expected] = chiSquaredTest([[sum([out.replay_match(1), out.replay_mismatch(1)]), ...
+                                                       sum([out.replay_match(2), out.replay_mismatch(2)])]; ...
+                                                      [sum([out.replay_norip_match(1), out.replay_norip_mismatch(1)]), ...
+                                                       sum([out.replay_norip_match(2), out.replay_norip_mismatch(2)])]]);
 
-%% Panel 2: HIP to Frontal
+% Panel 2: HIP to Frontal
 iRa = 5; % HIP
-[coR_replay_pl, coR_replay_mm_pl, noR_replay_pl, noR_replay_mm_pl, ...
- coRap_pl, coRap_mm_pl, noRap_pl, noRap_mm_pl, ...
- coRdur_pl, coRdur_mm_pl, noRdur_pl, noRdur_mm_pl] = ...
-    aggregateRegionData(regions, regionsPlot, iRa, [1:3], coRcoF, coRcoF_mm, ...
-                        noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
-                        coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay);
+in = in_base;
+in.targetRegionsA = iRa;   % HIP
+in.targetRegionsB = [1:3]; % Frontal group
+out = aggregateRegionData(in);
 
-coR_fr = coRap_pl / coRdur_pl * 1e3;
-coR_mm_fr = coRap_mm_pl / coRdur_mm_pl * 1e3;
-noR_fr = noRap_pl / noRdur_pl * 1e3;
-noR_mm_fr = noRap_mm_pl / noRdur_mm_pl * 1e3;
+coR_fr    = out.coRap_total    / out.coRdur_total    * 1e3;
+coR_mm_fr = out.coRap_mm_total / out.coRdur_mm_total * 1e3;
+noR_fr    = out.noRap_total    / out.noRdur_total    * 1e3;
+noR_mm_fr = out.noRap_mm_total / out.noRdur_mm_total * 1e3;
 
 X = [1:4];
-Y = [coR_replay_pl(1)/sum(coR_replay_pl), coR_replay_mm_pl(1)/sum(coR_replay_mm_pl), ...
-     noR_replay_pl(1)/sum(noR_replay_pl), noR_replay_mm_pl(1)/sum(noR_replay_mm_pl)] * 100;
+Y = [out.replay_match(1)/sum(out.replay_match), out.replay_mismatch(1)/sum(out.replay_mismatch), ...
+     out.replay_norip_match(1)/sum(out.replay_norip_match), out.replay_norip_mismatch(1)/sum(out.replay_norip_mismatch)] * 100;
 
 axes(ha(2))
 yyaxis left
@@ -722,31 +731,30 @@ ax.YAxis(1).FontSize = 11;
 ax.YAxis(2).FontSize = 11;
 ax.LineWidth = 1;
 
-[chi2stat, pValue(2, 1), expected] = chiSquaredTest([[coR_replay_pl(1), coR_replay_pl(2)]; ...
-                                                      [coR_replay_mm_pl(1), coR_replay_mm_pl(2)]]);
-[chi2stat, pValue(2, 2), expected] = chiSquaredTest([[noR_replay_pl(1), noR_replay_pl(2)]; ...
-                                                      [noR_replay_mm_pl(1), noR_replay_mm_pl(2)]]);
-[chi2stat, pValue(2, 3), expected] = chiSquaredTest([[sum([coR_replay_pl(1), coR_replay_mm_pl(1)]), ...
-                                                       sum([coR_replay_pl(2), coR_replay_mm_pl(2)])]; ...
-                                                      [sum([noR_replay_pl(1), noR_replay_mm_pl(1)]), ...
-                                                       sum([noR_replay_pl(2), noR_replay_mm_pl(2)])]]);
+[chi2stat, pValue(2, 1), expected] = chiSquaredTest([[out.replay_match(1),       out.replay_match(2)]; ...
+                                                      [out.replay_mismatch(1),    out.replay_mismatch(2)]]);
+[chi2stat, pValue(2, 2), expected] = chiSquaredTest([[out.replay_norip_match(1), out.replay_norip_match(2)]; ...
+                                                      [out.replay_norip_mismatch(1), out.replay_norip_mismatch(2)]]);
+[chi2stat, pValue(2, 3), expected] = chiSquaredTest([[sum([out.replay_match(1), out.replay_mismatch(1)]), ...
+                                                       sum([out.replay_match(2), out.replay_mismatch(2)])]; ...
+                                                      [sum([out.replay_norip_match(1), out.replay_norip_mismatch(1)]), ...
+                                                       sum([out.replay_norip_match(2), out.replay_norip_mismatch(2)])]]);
 
-%% Panel 3: Ipsilateral (Same Hemisphere)
-[coR_replay_pl, coR_replay_mm_pl, noR_replay_pl, noR_replay_mm_pl, ...
- coRap_pl, coRap_mm_pl, noRap_pl, noRap_mm_pl, ...
- coRdur_pl, coRdur_mm_pl, noRdur_pl, noRdur_mm_pl] = ...
-    aggregateRegionData(regions, regionsPlot, [1:5],[1:5], coRcoF, coRcoF_mm, ...
-                        noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
-                        coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay, true);
+% Panel 3: Ipsilateral (Same Hemisphere)
+in = in_base;
+in.targetRegionsA  = [1:5]; % all region groups, A side
+in.targetRegionsB  = [1:5]; % all region groups, B side
+in.sameHemisphere  = true;  % restrict to pairs in the same hemisphere
+out = aggregateRegionData(in);
 
-coR_fr = coRap_pl / coRdur_pl * 1e3;
-coR_mm_fr = coRap_mm_pl / coRdur_mm_pl * 1e3;
-noR_fr = noRap_pl / noRdur_pl * 1e3;
-noR_mm_fr = noRap_mm_pl / noRdur_mm_pl * 1e3;
+coR_fr    = out.coRap_total    / out.coRdur_total    * 1e3;
+coR_mm_fr = out.coRap_mm_total / out.coRdur_mm_total * 1e3;
+noR_fr    = out.noRap_total    / out.noRdur_total    * 1e3;
+noR_mm_fr = out.noRap_mm_total / out.noRdur_mm_total * 1e3;
 
 X = [1:4];
-Y = [coR_replay_pl(1)/sum(coR_replay_pl), coR_replay_mm_pl(1)/sum(coR_replay_mm_pl), ...
-     noR_replay_pl(1)/sum(noR_replay_pl), noR_replay_mm_pl(1)/sum(noR_replay_mm_pl)] * 100;
+Y = [out.replay_match(1)/sum(out.replay_match), out.replay_mismatch(1)/sum(out.replay_mismatch), ...
+     out.replay_norip_match(1)/sum(out.replay_norip_match), out.replay_norip_mismatch(1)/sum(out.replay_norip_mismatch)] * 100;
 
 axes(ha(3))
 yyaxis left
@@ -783,31 +791,30 @@ ax.YAxis(1).FontSize = 11;
 ax.YAxis(2).FontSize = 11;
 ax.LineWidth = 1;
 
-[chi2stat, pValue(3, 1), expected] = chiSquaredTest([[coR_replay_pl(1), coR_replay_pl(2)]; ...
-                                                      [coR_replay_mm_pl(1), coR_replay_mm_pl(2)]]);
-[chi2stat, pValue(3, 2), expected] = chiSquaredTest([[noR_replay_pl(1), noR_replay_pl(2)]; ...
-                                                      [noR_replay_mm_pl(1), noR_replay_mm_pl(2)]]);
-[chi2stat, pValue(3, 3), expected] = chiSquaredTest([[sum([coR_replay_pl(1), coR_replay_mm_pl(1)]), ...
-                                                       sum([coR_replay_pl(2), coR_replay_mm_pl(2)])]; ...
-                                                      [sum([noR_replay_pl(1), noR_replay_mm_pl(1)]), ...
-                                                       sum([noR_replay_pl(2), noR_replay_mm_pl(2)])]]);
+[chi2stat, pValue(3, 1), expected] = chiSquaredTest([[out.replay_match(1),       out.replay_match(2)]; ...
+                                                      [out.replay_mismatch(1),    out.replay_mismatch(2)]]);
+[chi2stat, pValue(3, 2), expected] = chiSquaredTest([[out.replay_norip_match(1), out.replay_norip_match(2)]; ...
+                                                      [out.replay_norip_mismatch(1), out.replay_norip_mismatch(2)]]);
+[chi2stat, pValue(3, 3), expected] = chiSquaredTest([[sum([out.replay_match(1), out.replay_mismatch(1)]), ...
+                                                       sum([out.replay_match(2), out.replay_mismatch(2)])]; ...
+                                                      [sum([out.replay_norip_match(1), out.replay_norip_mismatch(1)]), ...
+                                                       sum([out.replay_norip_match(2), out.replay_norip_mismatch(2)])]]);
 
-%% Panel 4: Contralateral (Different Hemispheres)
-[coR_replay_pl, coR_replay_mm_pl, noR_replay_pl, noR_replay_mm_pl, ...
- coRap_pl, coRap_mm_pl, noRap_pl, noRap_mm_pl, ...
- coRdur_pl, coRdur_mm_pl, noRdur_pl, noRdur_mm_pl] = ...
-    aggregateRegionData(regions, regionsPlot, [1:5], [1:5], coRcoF, coRcoF_mm, ...
-                        noRcoF, noRcoF_mm, coRap, coRap_mm, noRap, noRap_mm, ...
-                        coRdur, coRdur_mm, noRdur, noRdur_mm, coR_replay, false);
+% Panel 4: Contralateral (Different Hemispheres)
+in = in_base;
+in.targetRegionsA  = [1:5]; % all region groups, A side
+in.targetRegionsB  = [1:5]; % all region groups, B side
+in.sameHemisphere  = false; % restrict to pairs in opposite hemispheres
+out = aggregateRegionData(in);
 
-coR_fr = coRap_pl / coRdur_pl * 1e3;
-coR_mm_fr = coRap_mm_pl / coRdur_mm_pl * 1e3;
-noR_fr = noRap_pl / noRdur_pl * 1e3;
-noR_mm_fr = noRap_mm_pl / noRdur_mm_pl * 1e3;
+coR_fr    = out.coRap_total    / out.coRdur_total    * 1e3;
+coR_mm_fr = out.coRap_mm_total / out.coRdur_mm_total * 1e3;
+noR_fr    = out.noRap_total    / out.noRdur_total    * 1e3;
+noR_mm_fr = out.noRap_mm_total / out.noRdur_mm_total * 1e3;
 
 X = [1:4];
-Y = [coR_replay_pl(1)/sum(coR_replay_pl), coR_replay_mm_pl(1)/sum(coR_replay_mm_pl), ...
-     noR_replay_pl(1)/sum(noR_replay_pl), noR_replay_mm_pl(1)/sum(noR_replay_mm_pl)] * 100;
+Y = [out.replay_match(1)/sum(out.replay_match), out.replay_mismatch(1)/sum(out.replay_mismatch), ...
+     out.replay_norip_match(1)/sum(out.replay_norip_match), out.replay_norip_mismatch(1)/sum(out.replay_norip_mismatch)] * 100;
 
 axes(ha(4))
 yyaxis left
@@ -841,14 +848,14 @@ ax.YAxis(1).FontSize = 11;
 ax.YAxis(2).FontSize = 11;
 ax.LineWidth = 1;
 
-[chi2stat1, pValue(4, 1), expected1] = chiSquaredTest([[coR_replay_pl(1), coR_replay_pl(2)]; ...
-                                                        [coR_replay_mm_pl(1), coR_replay_mm_pl(2)]]);
-[chi2stat2, pValue(4, 2), expected2] = chiSquaredTest([[noR_replay_pl(1), noR_replay_pl(2)]; ...
-                                                        [noR_replay_mm_pl(1), noR_replay_mm_pl(2)]]);
-[chi2stat, pValue(4, 3), expected] = chiSquaredTest([[sum([coR_replay_pl(1), coR_replay_mm_pl(1)]), ...
-                                                       sum([coR_replay_pl(2), coR_replay_mm_pl(2)])]; ...
-                                                      [sum([noR_replay_pl(1), noR_replay_mm_pl(1)]), ...
-                                                       sum([noR_replay_pl(2), noR_replay_mm_pl(2)])]]);
+[chi2stat1, pValue(4, 1), expected1] = chiSquaredTest([[out.replay_match(1),       out.replay_match(2)]; ...
+                                                        [out.replay_mismatch(1),    out.replay_mismatch(2)]]);
+[chi2stat2, pValue(4, 2), expected2] = chiSquaredTest([[out.replay_norip_match(1), out.replay_norip_match(2)]; ...
+                                                        [out.replay_norip_mismatch(1), out.replay_norip_mismatch(2)]]);
+[chi2stat, pValue(4, 3), expected] = chiSquaredTest([[sum([out.replay_match(1), out.replay_mismatch(1)]), ...
+                                                       sum([out.replay_match(2), out.replay_mismatch(2)])]; ...
+                                                      [sum([out.replay_norip_match(1), out.replay_norip_mismatch(1)]), ...
+                                                       sum([out.replay_norip_match(2), out.replay_norip_mismatch(2)])]]);
 
 fig = gcf;
 fig.Color = 'w';
@@ -859,4 +866,252 @@ adj_p = nan(size(pValue));
 [h, crit_p, adj_ci_cvrg, adj_p(~isnan(pValue))] = fdr_bh(pValue(~isnan(pValue)), 0.05, 'pdep', 'yes');
 
 savepdf(gcf, fullfile(exportDirFigs, sprintf('coRipReplay_%s.pdf', tag)))
+
+%% Figure 2: Replay by subject
+in = struct();
+in.regions        = regions;        % region labels (cell array, per channel)
+in.regionsPlot    = regionsPlot;    % region groups to query against `regions`
+in.targetRegionsA = [1:5];          % all region groups, A side
+in.targetRegionsB = [1:5];          % all region groups, B side
+in.coRcoF         = coRcoF;         % co-ripple co-firing counts, matched trials
+in.noRcoF         = noRcoF;         % no-ripple control co-firing counts, matched
+in.coRap          = coRap;          % co-ripple action-potential counts, matched
+in.coRap_mm       = coRap_mm;       % co-ripple AP counts, mismatched
+in.noRap          = noRap;          % no-ripple control AP counts, matched
+in.noRap_mm       = noRap_mm;       % no-ripple control AP counts, mismatched
+in.coRdur         = coRdur;         % co-ripple durations (ms), matched
+in.coRdur_mm      = coRdur_mm;      % co-ripple durations, mismatched
+in.noRdur         = noRdur;         % no-ripple control durations, matched
+in.noRdur_mm      = noRdur_mm;      % no-ripple control durations, mismatched
+in.subjID         = subjID;         % subject index per trial and region pair
+in.respTimes      = respTimes;      % trial response times for fast/slow split
+in.loads          = loads;          % memory load per trial
+
+out = aggregateRegionDataSubj(in);
+
+coSubj_fn     = out.coSubj;
+noSubj_fn     = out.noSubj;
+coFastSubj_fn = out.coFastSubj;
+coSlowSubj_fn = out.coSlowSubj;
+nSubj         = numel(coSubj_fn);
+
+% Fix NaN edge cases: if one RT bin is NaN but the other isn't, set to 0
+coFastSubj_fn(isnan(coFastSubj_fn) & ~isnan(coSlowSubj_fn)) = 0;
+coSlowSubj_fn(~isnan(coFastSubj_fn) & isnan(coSlowSubj_fn)) = 0;
+
+% Statistics
+p_coNo   = pairedPermutationTest(coSubj_fn(~isnan(coSubj_fn))', noSubj_fn(~isnan(noSubj_fn))', 10e3);
+p_rtSplit = pairedPermutationTest(coFastSubj_fn(~isnan(coFastSubj_fn))', coSlowSubj_fn(~isnan(coSlowSubj_fn))', 10e3);
+[P_rt, observeddifference_rt, effectsize_rt] = permutationTestMed(coFastSubj_fn(~isnan(coFastSubj_fn))', coSlowSubj_fn(~isnan(coSlowSubj_fn))', 10e3);
+[P_rt_sr, H_rt_sr] = signrank(coFastSubj_fn, coSlowSubj_fn, 'tail', 'both');
+
+clr = brewermap(10, 'Paired');
+
+figure('Position', [738 907 201 248]);
+
+% --- Subplot 1: co-ripple vs no-ripple replay rate per subject ---
+subplot(1, 2, 1)
+for iS = 1:nSubj
+    jitterX = 0.5 * (rand - 0.5);
+
+    pl = plot([1+jitterX 2+jitterX], [coSubj_fn(iS), noSubj_fn(iS)], '-'); hold on;
+    pl.Color = [0.8 0.8 0.8];
+    pl.LineWidth = 0.25;
+
+    pl = scatter(1+jitterX, coSubj_fn(iS), 'o'); hold on;
+    pl.SizeData = 20;
+    pl.MarkerFaceColor = clr(8, :);
+    pl.MarkerEdgeAlpha = 0.0;
+
+    pl = scatter(2+jitterX, noSubj_fn(iS), 'o'); hold on;
+    pl.SizeData = 20;
+    pl.MarkerFaceColor = clr(1, :);
+    pl.MarkerEdgeAlpha = 0.0;
+end
+
+boxplot(coSubj_fn, 'positions', 1, 'width', 0.2, 'Colors', [0 0 0], 'Symbol', '', 'Whisker', 1);
+boxplot(noSubj_fn, 'positions', 2, 'width', 0.2, 'Colors', [0 0 0], 'Symbol', '', 'Whisker', 1);
+
+xlim([0 3])
+ax = gca;
+ax.XTick = 1:2;
+box off
+
+% --- Subplot 2: fast RT vs slow RT co-ripple replay rate per subject ---
+subplot(1, 2, 2)
+for iS = 1:nSubj
+    jitterX = 0.5 * (rand - 0.5);
+
+    pl = plot([1+jitterX 2+jitterX], [coFastSubj_fn(iS), coSlowSubj_fn(iS)], '-'); hold on;
+    pl.Color = [0.8 0.8 0.8];
+    pl.LineWidth = 0.25;
+
+    pl = scatter(1+jitterX, coFastSubj_fn(iS), 'o'); hold on;
+    pl.SizeData = 20;
+    pl.MarkerFaceColor = clr(8, :);
+    pl.MarkerEdgeAlpha = 0.0;
+
+    pl = scatter(2+jitterX, coSlowSubj_fn(iS), 'o'); hold on;
+    pl.SizeData = 20;
+    pl.MarkerFaceColor = 0.6 * clr(8, :);
+    pl.MarkerEdgeAlpha = 0.0;
+end
+
+boxplot(coFastSubj_fn, 'positions', 1, 'width', 0.2, 'Colors', [0 0 0], 'Symbol', '', 'Whisker', 1);
+boxplot(coSlowSubj_fn, 'positions', 2, 'width', 0.2, 'Colors', [0 0 0], 'Symbol', '', 'Whisker', 1);
+
+ax = gca;
+ax.XTick = 1:2;
+xlim([0 3])
+box off
+
+fig = gcf;
+fig.Color = 'w';
+
+savepdf(gcf, fullfile(exportDirFigs, 'ReplayBySubject_fn.pdf'))
+
+
+%% Figure 3: Fast v slow v shuffle v no ripple
+
+regionColors = brewermap(12, 'Dark2');
+contraColor  = brewermap(12, 'Accent');
+bW = 0.8;
+
+% --- Shared base struct (data arrays common to both functions) ---
+in_base = struct();
+in_base.regions     = regions;       % region labels (cell array, per channel)
+in_base.regionsPlot = regionsPlot;   % region groups to query against `regions`
+in_base.coRcoF      = coRcoF;        % co-ripple co-firing counts, matched trials
+in_base.coRcoF_mm   = coRcoF_mm;     % co-ripple co-firing counts, mismatched trials
+in_base.noRcoF      = noRcoF;        % no-ripple control co-firing counts, matched
+in_base.noRcoF_mm   = noRcoF_mm;     % no-ripple control co-firing counts, mismatched
+in_base.coRap       = coRap;         % co-ripple action-potential counts, matched
+in_base.coRap_mm    = coRap_mm;      % co-ripple AP counts, mismatched
+in_base.noRap       = noRap;         % no-ripple control AP counts, matched
+in_base.noRap_mm    = noRap_mm;      % no-ripple control AP counts, mismatched
+in_base.coRdur      = coRdur;        % co-ripple durations (ms), matched
+in_base.coRdur_mm   = coRdur_mm;     % co-ripple durations, mismatched
+in_base.noRdur      = noRdur;        % no-ripple control durations, matched
+in_base.noRdur_mm   = noRdur_mm;     % no-ripple control durations, mismatched
+in_base.coR_replay  = coR_replay;    % co-ripple replay mask per region pair
+in_base.respTimes   = respTimes;     % trial response times for fast/slow RT split
+in_base.loads       = loads;         % memory load per trial
+
+% Additional fields needed only by the shuffle function
+shuff_base = in_base;
+shuff_base.subjID = subjID;          % subject index per trial/pair (for within-subject shuffle)
+shuff_base.nIter  = 2e2;            % number of shuffle iterations
+
+
+% ---- Panel definitions -----------------------------------------------
+% Each row: {label, targetRegionsA, targetRegionsB, loadParam, sameHemisphere, barColor}
+panels = { ...
+    'AMY ctx', 4,     [1:3], 3, [],    regionColors(4,:); ...
+    'HIP ctx', 5,     [1:3], 3, [],    regionColors(5,:); ...
+    'Ipsilateral', [1:5], [1:5], 3, true,  regionColors(6,:); ...
+    'Contralateral',[1:5],[1:5], 3, false, contraColor(7,:)   ...
+};
+
+figure('Position', [2 632 755 299]);
+ha = tight_subplot(1, 4, [0.25, 0.05], [.05 .05], [.075 .05]);
+
+for iPanel = 1:4
+
+    label         = panels{iPanel, 1};
+    trgA          = panels{iPanel, 2};
+    trgB          = panels{iPanel, 3};
+    lParam        = panels{iPanel, 4};
+    sameHemi      = panels{iPanel, 5};
+    barColor      = panels{iPanel, 6};
+
+    % -- aggregateRegionData: fast/slow RT split and no-ripple control --
+    aggIn                = in_base;
+    aggIn.targetRegionsA = trgA;
+    aggIn.targetRegionsB = trgB;
+    aggIn.loadParam      = lParam;
+    aggIn.sameHemisphere = sameHemi;
+    aggOut = aggregateRegionData(aggIn);
+
+    fastRate  = aggOut.replay_fast_match(1)     / sum(aggOut.replay_fast_match)     * 100;
+    slowRate  = aggOut.replay_slow_match(1)     / sum(aggOut.replay_slow_match)     * 100;
+    noRipRate = aggOut.replay_norip_match(1)    / sum(aggOut.replay_norip_match)    * 100;
+
+    % -- aggregateRegionDataShuff: shuffle null distribution --
+    shuffIn                = shuff_base;
+    shuffIn.targetRegionsA = trgA;
+    shuffIn.targetRegionsB = trgB;
+    shuffIn.loadParam      = lParam;
+    shuffIn.sameHemisphere = sameHemi;
+    shuffOut = aggregateRegionDataShuff(shuffIn);
+
+    % -- Plot --
+    X = [1, 2, 3, 3.5];
+    Y = [fastRate, NaN, slowRate, mean(shuffOut.shuff)];
+
+    axes(ha(iPanel))
+
+    % Fast RT bar (solid)
+    b = bar(X(1), Y(1), bW); hold on;
+    b.FaceColor = barColor;
+    b.FaceAlpha = 1;
+    b.LineWidth = 1;
+
+    % Slow RT bar (striped)
+    b = bar_striped(X(2), Y(3), bW, 0.02, 5); hold on;
+    b.FaceColor = barColor;
+    b.FaceAlpha = 1;
+    b.LineWidth = 1;
+
+    % Shuffle mean bar (translucent)
+    b = bar(X(4), Y(4), bW); hold on;
+    b.FaceColor = barColor;
+    b.FaceAlpha = 0.5;
+    b.LineWidth = 1;
+
+    % Shuffle distribution ? filled polygon to the left of X(4)
+    [N, bn] = histcounts(shuffOut.shuff, 0:0.005:0.40, 'Normalization', 'probability');
+    bn = movmean(bn, 2);
+    bn(1) = [];
+    N  = smoothdata(N, 'gaussian', 5);
+    N  = N / max(N);
+    xx = (X(1) - bW/2 - 0.2) - N(N > 0);
+    xx(end+1) = xx(1);
+    yy = bn(N > 0);
+    yy(end+1) = yy(1);
+
+    fl = fill(xx, yy, 'r'); hold on;
+    fl.LineWidth  = 1.5;
+    fl.EdgeColor  = barColor;
+    fl.FaceColor  = [0.7 0.7 0.7];
+
+    % Axes formatting
+    ax = gca;
+    ax.XTick             = [-0.1, 1:4];
+    ax.XTickLabelRotation = 50;
+    ax.YAxis(1).Color    = [0 0 0];
+    ax.YAxis(1).Limits   = [0, max([Y(1), Y(3), Y(4)]) * 1.1];
+    ax.YAxis(1).FontSize = 11;
+    ax.LineWidth         = 1;
+    xlim([-1 4.5])
+    box off
+    title(label, 'FontSize', 9)
+
+    % -- Statistics --
+    [~, pFastSlow] = chiSquaredTest([ ...
+        [aggOut.replay_fast_match(1), aggOut.replay_fast_match(2)]; ...
+        [aggOut.replay_slow_match(1), aggOut.replay_slow_match(2)]]);
+    fprintf('%s  fast vs slow RT: p = %.5f\n', label, pFastSlow)
+
+    coTot = aggOut.replay_fast_match + aggOut.replay_slow_match;
+    [~, pCoNo] = chiSquaredTest([ ...
+        [coTot(1),                       coTot(2)]; ...
+        [aggOut.replay_norip_match(1),   aggOut.replay_norip_match(2)]]);
+    fprintf('%s  co vs no-ripple: p = %.5f\n', label, pCoNo)
+
+end
+
+fig = gcf;
+fig.Color = 'w';
+
+savepdf(gcf, fullfile(exportDirFigs, 'ReplayFastSlow_shuff_fn.pdf'))
 
