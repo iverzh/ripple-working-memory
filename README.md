@@ -2,7 +2,7 @@
 
 This repository contains MATLAB and Python code accompanying:
 
-> Verzhbinsky, I. A., Daume, J., Rutishauser, U., & Halgren, E.
+> Verzhbinsky, I. A., Daume, J., Cheng, S., Rutishauser, U., & Halgren, E.
 > *Cross-region neuron co-firing mediated by ripple oscillations supports
 > distributed working memory representations.* Nature Neuroscience (in press, 2026).
 
@@ -293,7 +293,7 @@ The analysis scripts produce:
 
 **For this analysis code and the accompanying paper:**
 ```
-Verzhbinsky, I. A., Daume, J., Rutishauser, U., & Halgren, E. (2026).
+Verzhbinsky, I. A., Daume, J., Cheng, S., Rutishauser, U., & Halgren, E. (2026).
 Cross-region neuron co-firing mediated by ripple oscillations supports
 distributed working memory representations. Nature Neuroscience (in press).
 
