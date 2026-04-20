@@ -4,7 +4,7 @@ This repository contains MATLAB and Python code accompanying:
 
 > Verzhbinsky, I. A., Daume, J., Cheng, S., Rutishauser, U., & Halgren, E.
 > *Cross-region neuron co-firing mediated by ripple oscillations supports
-> distributed working memory representations.* Nature Neuroscience (in press, 2026).
+> distributed working memory representations.* (in press, 2026).
 
 The code analyzes ripple oscillations and single-unit activity recorded from
 human intracranial electrodes during a Sternberg working memory task. It
